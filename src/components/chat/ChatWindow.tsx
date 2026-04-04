@@ -6,6 +6,7 @@ import ChatInput from './ChatInput'
 import QuickReplies from './QuickReplies'
 import TypingIndicator from './TypingIndicator'
 import { DISCLAIMER } from '@/lib/disclaimer'
+import { isBookingComplete, extractBooking } from '@/lib/booking-extractor'
 
 const QUICK_REPLIES = [
   'Book Appointment',
@@ -20,42 +21,74 @@ const WELCOME_MESSAGE =
   "Hi! I'm your dental office assistant. I can help you schedule an appointment, " +
   "answer common questions, or connect you with our staff. How can I help you today?"
 
-// Placeholder responses for Phase 1 — replaced by Claude API in Phase 4
-const PLACEHOLDER_RESPONSE =
-  "Thanks for your message! I can help with scheduling and office questions. " +
-  "To get started, try one of the quick replies above, or ask me about " +
-  "office hours, insurance, or booking an appointment."
-
 type Message = {
   role: 'bot' | 'user'
   content: string
 }
 
-export default function ChatWindow() {
+type Props = {
+  tenantId: string
+}
+
+export default function ChatWindow({ tenantId }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'bot', content: WELCOME_MESSAGE },
   ])
   const [showQuickReplies, setShowQuickReplies] = useState(true)
   const [isTyping, setIsTyping] = useState(false)
+  const [bookingDone, setBookingDone] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  const handleSend = (text: string) => {
-    setShowQuickReplies(false)
-    setMessages((prev) => [...prev, { role: 'user', content: text }])
+  const handleSend = async (text: string) => {
+    if (isTyping || bookingDone) return
 
-    // Phase 4: replace this block with a POST to /api/chat
+    setShowQuickReplies(false)
+    const updatedMessages: Message[] = [...messages, { role: 'user', content: text }]
+    setMessages(updatedMessages)
     setIsTyping(true)
-    setTimeout(() => {
+
+    try {
+      // Build message history in Claude's format
+      const apiMessages = updatedMessages.map((m) => ({
+        role: m.role === 'bot' ? 'assistant' : 'user',
+        content: m.content,
+      }))
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages, tenantId }),
+      })
+
+      const data = await res.json()
+      const reply: string = data.reply ?? 'Sorry, something went wrong. Please try again.'
+
+      setIsTyping(false)
+      setMessages((prev) => [...prev, { role: 'bot', content: reply }])
+
+      // If Claude signals a completed booking, save it to the DB
+      if (isBookingComplete(reply)) {
+        const booking = extractBooking(reply)
+        if (booking) {
+          setBookingDone(true)
+          await fetch('/api/bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...booking, tenant_id: tenantId }),
+          })
+        }
+      }
+    } catch {
       setIsTyping(false)
       setMessages((prev) => [
         ...prev,
-        { role: 'bot', content: PLACEHOLDER_RESPONSE },
+        { role: 'bot', content: 'Connection error. Please try again.' },
       ])
-    }, 1000)
+    }
   }
 
   return (
@@ -102,7 +135,7 @@ export default function ChatWindow() {
 
       {/* Input */}
       <div className="px-4 py-3 border-t border-slate-100">
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInput onSend={handleSend} disabled={isTyping || bookingDone} />
       </div>
     </div>
   )

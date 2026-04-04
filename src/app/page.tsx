@@ -39,7 +39,7 @@ export default function Home() {
 
         {/* Right: Chat Widget */}
         <div className="w-full max-w-sm mx-auto lg:mx-0 lg:ml-auto">
-          <ChatWindow />
+          <ChatWindow tenantId="81608031-89ca-4bed-9249-3d52b7fcc6f7" />
           <p className="mt-3 text-center text-xs text-slate-400">
             Live demo — try asking about office hours or booking
           </p>
