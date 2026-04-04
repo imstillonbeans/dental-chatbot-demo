@@ -3,7 +3,7 @@
   var tenant = script.getAttribute('data-tenant');
   if (!tenant) { console.error('[DentalChat] Missing data-tenant attribute'); return; }
 
-  var base = script.getAttribute('data-base') || 'https://dental-chatbot-m41qw6q6x-jacksonseymour07-3163s-projects.vercel.app';
+  var base = script.getAttribute('data-base') || 'https://dental-chatbot-xi.vercel.app';
 
   var iframe = document.createElement('iframe');
   iframe.src = base + '/embed?tenant=' + encodeURIComponent(tenant);
