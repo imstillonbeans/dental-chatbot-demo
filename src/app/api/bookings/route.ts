@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
         const { Resend } = await import('resend')
         const resend = new Resend(process.env.RESEND_API_KEY)
 
-        await resend.emails.send({
-          from: 'bookings@yourdomain.com',
+        const { data: emailData, error: emailError } = await resend.emails.send({
+          from: 'Dental Chatbot <onboarding@resend.dev>',
           to: tenant.notification_email,
           subject: `New Booking Request — ${patient_name}`,
           text: [
@@ -52,6 +52,8 @@ export async function POST(req: NextRequest) {
             `Booking ID: ${booking.id}`,
           ].join('\n'),
         })
+        if (emailError) console.error('[/api/bookings] Resend error:', emailError)
+        else console.log('[/api/bookings] Email sent:', emailData?.id)
       }
     }
 
